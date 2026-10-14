@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Release builds (rebuild with make_alpha_release.ps1)
+Releases/
+GUNTER-*/
+*.zip
+*.rar
+
+# Backup / intermediate copies of the master list
+master_list.backup.csv
+master_list.csv.before_delete_backup.csv
+master_list.csv.cleaned.csv
+master_list.merged.csv
+master_list.merged.csv.before_delete_backup.csv
+
+# Personal character data
+Export.txt
+stamp_progress.json

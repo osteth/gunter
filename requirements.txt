@@ -1,0 +1,10 @@
+# GUNTER runtime dependencies
+#
+# For alpha testers: this app runs with the Python standard library only.
+# These are OPTIONAL quality-of-life packages:
+#
+# - pillow   (enables loading JPEG icon files in Tk; .ico works without it on Windows)
+#
+# If you add any required third-party deps in the future, list them here.
+
+tkinterdnd2
