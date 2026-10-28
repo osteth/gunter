@@ -20,8 +20,12 @@ Folders included:
 Option A (recommended): run the installer
 
 - Double-click `INSTALL_GUNTER.bat`
+- **Python is not required** when the release includes the `app\` folder (`app\GUNTER.exe`).
+  Releases built by GitHub Actions always include it.
 
 Option B: run directly (portable)
+
+- Double-click `app\GUNTER.exe` (no install, no Python), or run from source:
 
 1. Install Python 3.10+ (from python.org) and make sure **“Add Python to PATH”** is enabled.
 2. Open the folder and run:
@@ -45,3 +49,12 @@ If they don’t want a console window, use the app menu:
 - (Optional) Enable **Auto-sync from folder** and point it at the folder where UtilityBelt writes exports. GUNTER will auto-sync the newest `questbonuses_export_YYYYMMDD_HHMMSS.txt`.
 - Use **Hide Completed** to focus on remaining stamps.
 
+
+### Building a release (maintainers)
+
+Push a tag like `v0.4.7-alpha1` and the **Build Windows release** GitHub Action builds
+`GUNTER.exe` with PyInstaller and attaches `GUNTER-<version>-windows.zip` to a GitHub release.
+You can also trigger it manually from the Actions tab.
+
+To build locally on Windows: `python -m pip install pyinstaller tkinterdnd2`, then run
+`build_exe.ps1` followed by `make_alpha_release.ps1`.

@@ -32,8 +32,14 @@ $packageRoot = Split-Path -Parent $here
 $versionFile = Join-Path $packageRoot "VERSION"
 $version = if (Test-Path $versionFile) { (Get-Content $versionFile -Raw).Trim() } else { "unknown" }
 
-if (-not (Test-Path (Join-Path $packageRoot "gunter.py"))) { throw "Missing gunter.py in: $packageRoot" }
-if (-not (Test-Path (Join-Path $packageRoot "master_list.csv"))) { throw "Missing master_list.csv in: $packageRoot" }
+# Standalone build (app\GUNTER.exe) needs no Python; otherwise fall back to running gunter.py
+$appSrc = Join-Path $packageRoot "app"
+$useExe = Test-Path (Join-Path $appSrc "GUNTER.exe")
+
+if (-not $useExe) {
+  if (-not (Test-Path (Join-Path $packageRoot "gunter.py"))) { throw "Missing gunter.py in: $packageRoot" }
+  if (-not (Test-Path (Join-Path $packageRoot "master_list.csv"))) { throw "Missing master_list.csv in: $packageRoot" }
+}
 
 if ([string]::IsNullOrWhiteSpace($InstallDir)) {
   $defaultDir = Join-Path $env:LOCALAPPDATA "GUNTER"
@@ -49,10 +55,18 @@ New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 Write-Host "Installing GUNTER $version to: $InstallDir"
 
-Copy-Item (Join-Path $packageRoot "gunter.py") -Destination $InstallDir -Force
-Copy-Item (Join-Path $packageRoot "master_list.csv") -Destination $InstallDir -Force
-Copy-Item (Join-Path $packageRoot "VERSION") -Destination $InstallDir -Force
-if (Test-Path (Join-Path $packageRoot "requirements.txt")) { Copy-Item (Join-Path $packageRoot "requirements.txt") -Destination $InstallDir -Force }
+if ($useExe) {
+  # Exe bundle already contains master_list.csv, VERSION and images\
+  Copy-Item -Recurse -Force (Join-Path $appSrc "*") -Destination $InstallDir
+  # Remove a script left over from an older Python-based install
+  $oldScript = Join-Path $InstallDir "gunter.py"
+  if (Test-Path $oldScript) { Remove-Item -Force $oldScript }
+} else {
+  Copy-Item (Join-Path $packageRoot "gunter.py") -Destination $InstallDir -Force
+  Copy-Item (Join-Path $packageRoot "master_list.csv") -Destination $InstallDir -Force
+  Copy-Item (Join-Path $packageRoot "VERSION") -Destination $InstallDir -Force
+  if (Test-Path (Join-Path $packageRoot "requirements.txt")) { Copy-Item (Join-Path $packageRoot "requirements.txt") -Destination $InstallDir -Force }
+}
 
 if (Test-Path (Join-Path $packageRoot "README_ALPHA.md")) { Copy-Item (Join-Path $packageRoot "README_ALPHA.md") -Destination $InstallDir -Force }
 
@@ -62,8 +76,10 @@ if (Test-Path $imagesSrc) {
   Copy-Item -Recurse -Force $imagesSrc -Destination (Join-Path $InstallDir "images")
 }
 
-$pyGui = Find-PythonGui
-if (-not $pyGui) {
+$pyGui = if ($useExe) { $null } else { Find-PythonGui }
+if ($useExe) {
+  Write-Host "Using standalone GUNTER.exe (Python not required)."
+} elseif (-not $pyGui) {
   Write-Warning "Python not found on PATH. Install Python 3.10+ and re-run the installer."
   Write-Warning "You can still install the files now, but the shortcut won't run until Python is installed."
 } else {
@@ -89,8 +105,13 @@ $folder = Join-Path $startMenu "GUNTER"
 New-Item -ItemType Directory -Force -Path $folder | Out-Null
 
 $shortcutPath = Join-Path $folder "GUNTER.lnk"
-$target = if ($pyGui) { $pyGui } else { "python.exe" }
-$args = "`"$InstallDir\gunter.py`""
+if ($useExe) {
+  $target = Join-Path $InstallDir "GUNTER.exe"
+  $args = ""
+} else {
+  $target = if ($pyGui) { $pyGui } else { "python.exe" }
+  $args = "`"$InstallDir\gunter.py`""
+}
 $working = $InstallDir
 
 $icon = Join-Path $InstallDir "images\\EGG ICON.ico"

@@ -76,6 +76,17 @@ if (Test-Path ".\\images") {
   Copy-Item -Recurse -Force ".\\images\\*" -Destination (Join-Path $OutDir "images")
 }
 
+# Standalone exe build (from build_exe.ps1) -> app\
+# With this present, the installer uses GUNTER.exe and testers don't need Python.
+if (Test-Path ".\\dist\\GUNTER\\GUNTER.exe") {
+  $appOut = Join-Path $OutDir "app"
+  New-Item -ItemType Directory -Force -Path $appOut | Out-Null
+  Copy-Item -Recurse -Force ".\\dist\\GUNTER\\*" -Destination $appOut
+  Write-Host "Included standalone app: $appOut\GUNTER.exe"
+} else {
+  Write-Warning "dist\GUNTER\GUNTER.exe not found - release will require Python. Run build_exe.ps1 first."
+}
+
 Write-Host "Done."
 Write-Host "Send testers the folder: $OutDir"
 

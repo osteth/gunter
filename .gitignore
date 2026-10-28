@@ -18,3 +18,9 @@ master_list.merged.csv.before_delete_backup.csv
 # Personal character data
 Export.txt
 stamp_progress.json
+
+# PyInstaller output (rebuild with build_exe.ps1)
+build/
+dist/
+GUNTER.spec
+release/

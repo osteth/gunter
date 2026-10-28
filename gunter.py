@@ -34,6 +34,17 @@ except ImportError:
     PIL_AVAILABLE = False
 
 
+def get_app_dir() -> str:
+    """Folder holding the app's bundled files (master_list.csv, VERSION, images/).
+
+    When built with PyInstaller this is the folder containing GUNTER.exe;
+    otherwise it's the folder containing gunter.py.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 # Core logic functions (from find_missing_stamps.py)
 def read_completed_stamps(file_path: str) -> Set[str]:
     """Read completed stamps from a text file."""
@@ -162,7 +173,7 @@ class GUNTERApp:
         self.root.geometry("1500x800")
         
         # File paths
-        self.script_dir = os.path.dirname(os.path.abspath(__file__))
+        self.script_dir = get_app_dir()
         self.export_file_path = None
         self.master_list_path = os.path.join(self.script_dir, 'master_list.csv')
 
@@ -497,7 +508,7 @@ class GUNTERApp:
     def get_version(self) -> str:
         """Read VERSION file from app directory (fallback to 'dev')."""
         try:
-            version_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")
+            version_path = os.path.join(get_app_dir(), "VERSION")
             if os.path.exists(version_path):
                 with open(version_path, "r", encoding="utf-8") as f:
                     v = f.read().strip()
@@ -985,11 +996,17 @@ class GUNTERApp:
             return
 
         script_dir = self.script_dir
-        gunter_script = os.path.join(script_dir, "gunter.py")
-        python_exe = sys.executable
-        python_dir = os.path.dirname(python_exe)
-        pythonw_exe = os.path.join(python_dir, "pythonw.exe")
-        python_gui_exe = pythonw_exe if os.path.exists(pythonw_exe) else python_exe
+        if getattr(sys, "frozen", False):
+            # Standalone GUNTER.exe: launch it directly, no Python needed
+            launch_exe = sys.executable
+            launch_args = ""
+        else:
+            gunter_script = os.path.join(script_dir, "gunter.py")
+            python_exe = sys.executable
+            python_dir = os.path.dirname(python_exe)
+            pythonw_exe = os.path.join(python_dir, "pythonw.exe")
+            launch_exe = pythonw_exe if os.path.exists(pythonw_exe) else python_exe
+            launch_args = f"\"{gunter_script}\""
 
         # Prefer ICO for shortcuts
         icon_file = os.path.join(script_dir, "images", "EGG ICON.ico")
@@ -1014,8 +1031,8 @@ class GUNTERApp:
 
             shell = Dispatch("WScript.Shell")
             shortcut = shell.CreateShortCut(str(lnk_path))
-            shortcut.Targetpath = python_gui_exe
-            shortcut.Arguments = f"\"{gunter_script}\""
+            shortcut.Targetpath = launch_exe
+            shortcut.Arguments = launch_args
             shortcut.WorkingDirectory = str(script_dir)
             shortcut.Description = "GUNTER - Quest Stamp Tracker"
             if os.path.exists(icon_file):
@@ -1028,10 +1045,14 @@ class GUNTERApp:
             # Fallback: VBS launcher (runs hidden)
             try:
                 # 0 = hidden window, False = don't wait
+                vbs_args = (
+                    f' & " " & Chr(34) & "{gunter_script}" & Chr(34)'
+                    if launch_args else ""
+                )
                 vbs = (
                     'Set WshShell = CreateObject("WScript.Shell")\n'
                     f'WshShell.CurrentDirectory = "{script_dir}"\n'
-                    f'WshShell.Run Chr(34) & "{python_gui_exe}" & Chr(34) & " " & Chr(34) & "{gunter_script}" & Chr(34), 0, False\n'
+                    f'WshShell.Run Chr(34) & "{launch_exe}" & Chr(34){vbs_args}, 0, False\n'
                 )
                 with open(vbs_path, "w", encoding="utf-8") as f:
                     f.write(vbs)
