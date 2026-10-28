@@ -2,7 +2,9 @@ name: Build Windows release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -28,6 +30,34 @@ jobs:
       - name: Assemble release folder
         shell: pwsh
         run: ./make_alpha_release.ps1 -OutDir release/GUNTER
+
+      - name: Test install / uninstall keeps player data
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installDir = Join-Path $env:LOCALAPPDATA "GUNTER"
+          ./release/GUNTER/scripts/install_support.ps1 -Quiet -NoDesktopShortcut
+          if (-not (Test-Path "$installDir/GUNTER.exe")) { throw "Install did not produce GUNTER.exe" }
+
+          # Fake player data, as the app would write it
+          New-Item -ItemType Directory -Force "$installDir/profiles" | Out-Null
+          Set-Content "$installDir/profiles/default.json" '{"TestStamp": true}'
+          Set-Content "$installDir/settings.json" '{"active_profile_id": "default"}'
+
+          ./release/GUNTER/scripts/uninstall_support.ps1 -Quiet
+
+          if (Test-Path "$installDir/GUNTER.exe") { throw "Uninstall left GUNTER.exe behind" }
+          if (-not (Test-Path "$installDir/profiles/default.json")) { throw "Uninstall deleted player profiles" }
+          if (-not (Test-Path "$installDir/settings.json")) { throw "Uninstall deleted settings.json" }
+          $backups = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "GUNTER Backups"
+          if (-not (Get-ChildItem -Recurse "$backups" -Filter default.json)) { throw "No backup of profiles was made" }
+
+          # Reinstall over the kept data, then a full wipe with -RemoveUserData
+          ./release/GUNTER/scripts/install_support.ps1 -Quiet -NoDesktopShortcut
+          if (-not (Test-Path "$installDir/profiles/default.json")) { throw "Reinstall lost player profiles" }
+          ./release/GUNTER/scripts/uninstall_support.ps1 -Quiet -RemoveUserData
+          if (Test-Path $installDir) { throw "-RemoveUserData left $installDir behind" }
+          Write-Host "Install/uninstall test passed"
 
       - name: Zip release
         shell: pwsh

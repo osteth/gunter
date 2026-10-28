@@ -38,18 +38,32 @@ try {
   if (Test-Path $desktopShortcut) { Remove-Item -Force $desktopShortcut }
 } catch { }
 
-# Backup progress unless explicitly removing user data
-try {
-  $progress = Join-Path $InstallDir "stamp_progress.json"
-  if ((Test-Path $progress) -and (-not $RemoveUserData)) {
-    $backupRoot = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "GUNTER Backups"
-    New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
-    $stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
-    $dest = Join-Path $backupRoot "stamp_progress.$stamp.json"
-    Copy-Item $progress -Destination $dest -Force
-    Write-Host "Backed up progress to: $dest"
+# Player data (profiles\, settings.json) always lives in %LOCALAPPDATA%\GUNTER,
+# which is also the default install folder. Keep it unless -RemoveUserData.
+$userDataDir = Join-Path $env:LOCALAPPDATA "GUNTER"
+$userDataNames = @("profiles", "settings.json", "stamp_progress.json")
+
+# Back up player data unless explicitly removing it
+if (-not $RemoveUserData) {
+  try {
+    $toBackup = @()
+    foreach ($dir in @($userDataDir, $InstallDir) | Select-Object -Unique) {
+      foreach ($name in $userDataNames) {
+        $p = Join-Path $dir $name
+        if (Test-Path $p) { $toBackup += $p }
+      }
+    }
+    if ($toBackup.Count -gt 0) {
+      $stamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
+      $dest = Join-Path ([Environment]::GetFolderPath("MyDocuments")) "GUNTER Backups\$stamp"
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+      foreach ($p in $toBackup) { Copy-Item -Recurse -Force $p -Destination $dest }
+      Write-Host "Backed up your profiles and progress to: $dest"
+    }
+  } catch {
+    Write-Warning "Could not back up player data: $_"
   }
-} catch { }
+}
 
 if (-not $Quiet) {
   $resp = Read-Host "Remove installed files in $InstallDir ? (Y/n)"
@@ -64,9 +78,17 @@ if (Test-Path $InstallDir) {
   if ($RemoveUserData) {
     Remove-Item -Recurse -Force $InstallDir
   } else {
-    # Remove everything except (optionally) keep Export.txt (user might want it) – but most installs won't have it.
-    Remove-Item -Recurse -Force $InstallDir
+    # Remove app files but leave player data so a reinstall picks it back up
+    Get-ChildItem -Force $InstallDir |
+      Where-Object { $userDataNames -notcontains $_.Name } |
+      Remove-Item -Recurse -Force
+    if (-not (Get-ChildItem -Force $InstallDir)) { Remove-Item -Force $InstallDir }
+    else { Write-Host "Kept your profiles and progress in: $InstallDir" }
   }
+}
+
+if ($RemoveUserData -and (Test-Path $userDataDir)) {
+  Remove-Item -Recurse -Force $userDataDir
 }
 
 # Remove cached install info (so upgrade/uninstall don't target old dir)
